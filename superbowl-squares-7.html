@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Bowl Squares — Seahawks vs Patriots</title>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --team-a-color: #002244; --team-a-accent: #69BE28;
+    --team-b-color: #002244; --team-b-accent: #C60C30;
+  }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #f8f9fb 0%, #eef1f5 40%, #f5f6f8 100%);
+    color: #1a1a2e; font-family: 'Anybody', 'Oswald', sans-serif;
+    padding: 20px; position: relative; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; opacity: 0.025; z-index: 0; pointer-events: none;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 50px, #002244 50px, #002244 51px),
+      repeating-linear-gradient(90deg, transparent, transparent 50px, #002244 50px, #002244 51px);
+  }
+  .container { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; }
+  .sub-label {
+    font-size: 11px; letter-spacing: 6px; text-transform: uppercase; color: #8a919c;
+    font-family: 'Space Mono', monospace; margin-bottom: 6px; text-align: center;
+  }
+  h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 900; text-align: center; line-height: 1.1; letter-spacing: -1px; }
+  h1 .team-a { color: var(--team-a-color); }
+  h1 .vs { color: #b0b7bc; font-size: 0.6em; margin: 0 12px; }
+  h1 .team-b { color: var(--team-b-accent); }
+  .claimed-count { margin-top: 8px; font-family: 'Space Mono', monospace; font-size: 13px; color: #8a919c; text-align: center; }
+  .cta-area { text-align: center; margin: 24px 0; }
+  .cta-btn {
+    padding: 14px 36px; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, var(--team-a-color) 0%, var(--team-b-accent) 100%);
+    color: #fff; font-family: 'Anybody', sans-serif; font-weight: 900; font-size: 18px;
+    cursor: pointer; letter-spacing: 0.5px; box-shadow: 0 6px 24px rgba(0,34,68,0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .cta-btn:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(0,34,68,0.35); }
+  .cta-btn:disabled { background: #A5ACAF; cursor: default; transform: none; box-shadow: none; }
+  .cta-hint { margin-top: 8px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a919c; }
+  .loading-bar { margin-top: 12px; text-align: center; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a919c; }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #dde1e7; border-top-color: var(--team-a-color); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .grid-wrapper { overflow-x: auto; padding-bottom: 8px; }
+  .grid-inner { min-width: 620px; margin: 0 auto; width: fit-content; }
+  .axis-label-top { text-align: center; margin-bottom: 6px; font-weight: 900; font-size: clamp(14px, 2.5vw, 20px); color: var(--team-b-accent); letter-spacing: 3px; text-transform: uppercase; }
+  .grid-body { display: flex; }
+  .axis-label-left {
+    writing-mode: vertical-lr; transform: rotate(180deg);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: clamp(14px, 2.5vw, 20px);
+    color: var(--team-a-accent); letter-spacing: 3px; text-transform: uppercase;
+    padding-right: 6px; min-width: 30px; text-shadow: 1px 1px 2px rgba(0,0,0,0.15);
+  }
+  .col-headers { display: flex; margin-left: 52px; }
+  .col-header { width: clamp(46px, 7vw, 56px); text-align: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: clamp(14px, 2vw, 18px); color: var(--team-b-accent); padding: 4px 0; }
+  .grid-row { display: flex; align-items: center; }
+  .row-header { width: 52px; text-align: center; flex-shrink: 0; font-family: 'Space Mono', monospace; font-weight: 700; font-size: clamp(14px, 2vw, 18px); color: var(--team-a-color); }
+  .cell {
+    width: clamp(46px, 7vw, 56px); height: clamp(46px, 7vw, 56px);
+    margin: 1px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace; font-size: clamp(10px, 1.5vw, 13px); font-weight: 700;
+    text-align: center; line-height: 1.2; user-select: none; transition: all 0.1s ease;
+  }
+  .cell.empty { background: #fff; border: 1px solid #dde1e7; color: rgba(0,34,68,0.15); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .cell.claimed { border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+  .cell.animating { background: rgba(251,191,36,0.35) !important; border: 2px solid #fbbf24 !important; }
+  .cell.assigned { transform: scale(1.12); border: 2px solid var(--team-a-accent) !important; box-shadow: 0 0 20px rgba(105,190,40,0.33), 0 4px 16px rgba(0,0,0,0.12) !important; }
+  .how-it-works { margin-top: 24px; padding: 16px 20px; background: #fff; border-radius: 8px; border: 1px solid #dde1e7; font-family: 'Space Mono', monospace; font-size: 12px; color: #6b7280; line-height: 1.7; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,34,68,0.4); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.hidden { display: none; }
+  .modal { background: #fff; border-radius: 16px; padding: 32px 28px; width: 100%; max-width: 420px; border: 1px solid #dde1e7; box-shadow: 0 24px 80px rgba(0,34,68,0.2); }
+  .modal-title { font-weight: 900; font-size: 22px; margin-bottom: 4px; color: var(--team-a-color); }
+  .modal-subtitle { font-family: 'Space Mono', monospace; font-size: 12px; color: #8a919c; margin-bottom: 6px; line-height: 1.5; }
+  .modal-random-note { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--team-b-accent); margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-family: 'Space Mono', monospace; font-size: 11px; color: #6b7280; margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+  .form-input { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #dde1e7; background: #f8f9fb; color: #1a1a2e; font-family: 'Space Mono', monospace; font-size: 14px; outline: none; transition: border 0.2s; }
+  .form-input::placeholder { color: #b0b7bc; }
+  .form-input:focus { border-color: var(--team-a-color); }
+  .form-input.error { border-color: var(--team-b-accent); }
+  .form-error { color: var(--team-b-accent); font-size: 11px; margin-top: 4px; font-family: 'Space Mono', monospace; display: none; }
+  .form-error.show { display: block; }
+  .btn-row { display: flex; gap: 12px; margin-top: 24px; }
+  .btn-cancel { flex: 1; padding: 12px 0; border-radius: 8px; border: 1px solid #dde1e7; background: #f8f9fb; color: #6b7280; font-family: 'Anybody', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .btn-submit { flex: 2; padding: 12px 0; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--team-a-color) 0%, var(--team-b-accent) 100%); color: #fff; font-family: 'Anybody', sans-serif; font-weight: 900; font-size: 15px; cursor: pointer; letter-spacing: 0.5px; }
+  .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .result-modal { text-align: center; max-width: 400px; padding: 36px 32px; }
+  .result-emoji { font-size: 48px; margin-bottom: 8px; }
+  .result-title { font-weight: 900; font-size: 24px; margin-bottom: 8px; color: var(--team-a-color); }
+  .result-name { font-family: 'Space Mono', monospace; font-size: 14px; color: #6b7280; margin-bottom: 16px; line-height: 1.6; }
+  .result-name strong { color: #1a1a2e; }
+  .result-box { display: inline-flex; gap: 16px; align-items: center; background: #f8f9fb; border-radius: 12px; padding: 16px 28px; border: 1px solid #dde1e7; margin-bottom: 20px; }
+  .result-team-label { font-family: 'Space Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .result-digit { font-family: 'Anybody', sans-serif; font-weight: 900; font-size: 36px; }
+  .result-x { font-family: 'Space Mono', monospace; font-size: 18px; color: #b0b7bc; }
+  .result-hint { font-family: 'Space Mono', monospace; font-size: 11px; color: #8a919c; margin-bottom: 20px; }
+  .btn-gotit { padding: 12px 32px; border-radius: 8px; border: none; background: linear-gradient(135deg, var(--team-a-color) 0%, var(--team-b-accent) 100%); color: #fff; font-family: 'Anybody', sans-serif; font-weight: 900; font-size: 15px; cursor: pointer; }
+  .error-modal { text-align: center; max-width: 400px; padding: 36px 32px; }
+  .error-modal .error-msg { font-family: 'Space Mono', monospace; font-size: 13px; color: #6b7280; margin: 12px 0 20px; line-height: 1.6; }
+  #debugPanel {
+    margin-top: 20px; padding: 16px; background: #fff; border: 1px solid #dde1e7; border-radius: 8px;
+    font-family: 'Space Mono', monospace; font-size: 11px; color: #333;
+    max-height: 300px; overflow-y: auto; white-space: pre-wrap; display: none;
+  }
+  #debugToggle {
+    margin-top: 16px; text-align: center; font-family: 'Space Mono', monospace; font-size: 11px;
+    color: #b0b7bc; cursor: pointer;
+  }
+  #debugToggle:hover { color: #666; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="sub-label">🏈 Super Bowl Squares 🏈</div>
+  <h1><span class="team-a">Seahawks</span><span class="vs">vs</span><span class="team-b">Patriots</span></h1>
+  <div class="claimed-count" id="claimedCount">Loading...</div>
+  <div class="cta-area">
+    <button class="cta-btn" id="ctaBtn" onclick="openForm()" disabled>🎲 Enter &amp; Get a Random Square</button>
+    <div class="cta-hint">Your square will be randomly assigned — it's the luck of the draw!</div>
+    <div class="loading-bar" id="loadingBar"><span class="spinner"></span> Loading grid from server...</div>
+  </div>
+  <div class="grid-wrapper">
+    <div class="grid-inner">
+      <div class="axis-label-top">← Patriots Score (Last Digit) →</div>
+      <div class="grid-body">
+        <div class="axis-label-left">← Seahawks Score (Last Digit) →</div>
+        <div id="gridContainer"></div>
+      </div>
+    </div>
+  </div>
+  <div class="how-it-works">
+    <strong style="color:var(--team-a-color)">How it works:</strong>
+    Enter your info and a square will be <strong>randomly assigned</strong> to you — no picking allowed!
+    Each square maps to a unique combination of last digits for each team's score.
+    At the end of each quarter, the square where the last digit of
+    <span style="color:var(--team-a-color);font-weight:700">Seahawks</span>'s score (left axis) intersects with the last digit of
+    <span style="color:var(--team-b-accent);font-weight:700">Patriots</span>'s score (top axis) wins that quarter's payout.
+    Column and row numbers are randomly shuffled — it's pure luck!
+  </div>
+  <div id="debugToggle" onclick="toggleDebug()">⚙ Toggle Debug Log</div>
+  <div id="debugPanel"></div>
+</div>
+
+<!-- Form Modal -->
+<div class="modal-overlay hidden" id="formModal" onclick="if(event.target===this)closeForm()">
+  <div class="modal">
+    <div class="modal-title">Enter the Grid</div>
+    <div class="modal-subtitle" id="remainingText"></div>
+    <div class="modal-random-note">🎲 Your square is assigned by random draw · One entry per email</div>
+    <div class="form-group">
+      <label class="form-label" for="nameInput">Full Name</label>
+      <input class="form-input" type="text" id="nameInput" placeholder="John Doe">
+      <div class="form-error" id="nameError">Name is required</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="addressInput">Address</label>
+      <input class="form-input" type="text" id="addressInput" placeholder="123 Main St, City, ST 12345">
+      <div class="form-error" id="addressError">Address is required</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="emailInput">Email</label>
+      <input class="form-input" type="email" id="emailInput" placeholder="john@example.com">
+      <div class="form-error" id="emailError">Email is required</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeForm()">Cancel</button>
+      <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">🎲 Assign Me a Square!</button>
+    </div>
+  </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal-overlay hidden" id="resultModal" onclick="if(event.target===this)closeResult()">
+  <div class="modal result-modal">
+    <div class="result-emoji">🎉</div>
+    <div class="result-title">You Got Your Square!</div>
+    <div class="result-name"><strong id="resultName"></strong>, your square is:</div>
+    <div class="result-box">
+      <div style="text-align:center">
+        <div class="result-team-label" style="color:var(--team-a-accent)">Seahawks</div>
+        <div class="result-digit" style="color:var(--team-a-color)" id="resultDigitA"></div>
+      </div>
+      <div class="result-x">×</div>
+      <div style="text-align:center">
+        <div class="result-team-label" style="color:var(--team-b-accent)">Patriots</div>
+        <div class="result-digit" style="color:var(--team-b-accent)" id="resultDigitB"></div>
+      </div>
+    </div>
+    <div class="result-hint">You win if any quarter ends with these as the last digits!</div>
+    <button class="btn-gotit" onclick="closeResult()">Got It!</button>
+  </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal-overlay hidden" id="errorModal" onclick="if(event.target===this)closeError()">
+  <div class="modal error-modal">
+    <div class="result-emoji" style="font-size:40px">😬</div>
+    <div class="result-title" style="color:var(--team-b-accent)">Oops!</div>
+    <div class="error-msg" id="errorMsg"></div>
+    <button class="btn-gotit" onclick="closeError()">Try Again</button>
+  </div>
+</div>
+
+<script>
+// ==============================================
+// ⚠️ PASTE YOUR APPS SCRIPT WEB APP URL HERE ⚠️
+// ==============================================
+var API_URL = "YOUR_APPS_SCRIPT_URL_HERE";
+// ==============================================
+
+// ---- DEBUG ----
+function log(msg) {
+  var ts = new Date().toLocaleTimeString();
+  var line = ts + " | " + msg;
+  console.log("[SBSquares]", line);
+  var el = document.getElementById("debugPanel");
+  el.textContent += line + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+function toggleDebug() {
+  var el = document.getElementById("debugPanel");
+  el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+// ---- SHUFFLE (deterministic, same for all clients) ----
+function shuffleDigits(seed) {
+  var d = [0,1,2,3,4,5,6,7,8,9];
+  for (var i = d.length - 1; i > 0; i--) {
+    var j = Math.floor((Math.abs(Math.sin(seed * (i + 1)) * 9301 + 49297) % 233280) / 233280 * (i + 1));
+    var tmp = d[i]; d[i] = d[j]; d[j] = tmp;
+  }
+  return d;
+}
+var colDigits = shuffleDigits(42);
+var rowDigits = shuffleDigits(77);
+
+var COLORS = ["#002244","#69BE28","#A5ACAF","#C60C30","#B0B7BC","#003a1c","#1a3a5c","#8B0000","#4a7c2e","#3d5a80"];
+
+// ---- STATE ----
+var squares = {};
+for (var r = 0; r < 10; r++)
+  for (var c = 0; c < 10; c++)
+    squares[r + "-" + c] = null;
+
+var animKey = null;
+var assignKey = null;
+var busy = false;
+var refreshTimer = null;
+
+// ---- HELPERS ----
+function initials(name) {
+  return name.split(" ").map(function(w){return w.charAt(0)}).join("").toUpperCase().slice(0,2);
+}
+function color(r,c) { return COLORS[(r*10+c) % COLORS.length]; }
+function countClaimed() { var n=0; for(var k in squares) if(squares[k]) n++; return n; }
+function available() { var a=[]; for(var k in squares) if(!squares[k]) a.push(k); return a; }
+
+// ---- API ----
+function apiCall(params) {
+  var qs = Object.keys(params).map(function(k) {
+    return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  }).join("&");
+  var url = API_URL + "?" + qs;
+  log("API → " + params.action + " | " + url.substring(0, 120) + "...");
+
+  return fetch(url, { redirect: "follow" })
+    .then(function(resp) {
+      log("API ← status " + resp.status + " type " + resp.type);
+      return resp.text();
+    })
+    .then(function(text) {
+      log("API ← body[0:300]: " + text.substring(0, 300));
+      try {
+        return JSON.parse(text);
+      } catch(e) {
+        log("JSON PARSE ERROR: " + e.message);
+        throw new Error("Server returned invalid response. Check the debug log.");
+      }
+    });
+}
+
+// ---- LOAD FROM SERVER ----
+function loadFromServer() {
+  return apiCall({ action: "getClaimed" }).then(function(data) {
+    if (!data.success) {
+      log("getClaimed failed: " + JSON.stringify(data));
+      return;
+    }
+    log("getClaimed returned " + data.count + " claimed squares");
+
+    // Log a few keys so we can verify format
+    var keys = Object.keys(data.claimed);
+    if (keys.length > 0) {
+      log("Sample keys: " + keys.slice(0, 5).join(", "));
+    }
+
+    // Reset everything
+    for (var k in squares) squares[k] = null;
+
+    // Apply
+    for (var serverKey in data.claimed) {
+      if (!data.claimed.hasOwnProperty(serverKey)) continue;
+      // Normalize key: remove any spaces, ensure "R-C" format
+      var normalizedKey = serverKey.toString().trim();
+      if (squares.hasOwnProperty(normalizedKey)) {
+        squares[normalizedKey] = data.claimed[serverKey];
+        log("  ✓ Loaded " + normalizedKey + " → " + data.claimed[serverKey].name);
+      } else {
+        log("  ✗ Unknown key from server: '" + normalizedKey + "'");
+      }
+    }
+  }).catch(function(err) {
+    log("loadFromServer ERROR: " + err.message);
+  });
+}
+
+// ---- RENDER GRID ----
+function buildGrid() {
+  var ct = document.getElementById("gridContainer");
+  ct.innerHTML = "";
+
+  var hdr = document.createElement("div");
+  hdr.className = "col-headers";
+  for (var c = 0; c < 10; c++) {
+    var h = document.createElement("div");
+    h.className = "col-header";
+    h.textContent = colDigits[c];
+    hdr.appendChild(h);
+  }
+  ct.appendChild(hdr);
+
+  for (var r = 0; r < 10; r++) {
+    var row = document.createElement("div");
+    row.className = "grid-row";
+    var rh = document.createElement("div");
+    rh.className = "row-header";
+    rh.textContent = rowDigits[r];
+    row.appendChild(rh);
+    for (var c2 = 0; c2 < 10; c2++) {
+      var key = r + "-" + c2;
+      var cell = document.createElement("div");
+      cell.id = "cell-" + key;
+      renderCell(cell, key, r, c2);
+      row.appendChild(cell);
+    }
+    ct.appendChild(row);
+  }
+}
+
+function renderCell(cell, key, r, c) {
+  var d = squares[key];
+  cell.className = "cell";
+  if (d) {
+    cell.classList.add("claimed");
+    cell.style.background = color(r, c);
+    cell.textContent = initials(d.name);
+    cell.title = d.name + "\n" + (d.email || "");
+  } else {
+    cell.classList.add("empty");
+    cell.style.background = "#fff";
+    cell.textContent = "";
+    cell.title = "Row " + rowDigits[r] + ", Col " + colDigits[c];
+  }
+  if (key === assignKey) cell.classList.add("assigned");
+  if (key === animKey && !d) cell.classList.add("animating");
+}
+
+function refreshCell(key) {
+  var p = key.split("-");
+  var cell = document.getElementById("cell-" + key);
+  if (cell) renderCell(cell, key, parseInt(p[0]), parseInt(p[1]));
+}
+
+function updateUI() {
+  var n = countClaimed();
+  document.getElementById("claimedCount").textContent = n + "/100 squares claimed";
+  var btn = document.getElementById("ctaBtn");
+  if (n >= 100) { btn.disabled = true; btn.textContent = "All Squares Claimed!"; }
+  else { btn.disabled = false; }
+  document.getElementById("loadingBar").style.display = "none";
+}
+
+// ---- AUTO REFRESH ----
+function startRefresh() {
+  stopRefresh();
+  refreshTimer = setInterval(function() {
+    if (busy) return;
+    loadFromServer().then(function() { buildGrid(); updateUI(); });
+  }, 30000);
+}
+function stopRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+// ---- FORM ----
+function openForm() {
+  if (countClaimed() >= 100) return;
+  assignKey = null;
+  document.getElementById("nameInput").value = "";
+  document.getElementById("addressInput").value = "";
+  document.getElementById("emailInput").value = "";
+  document.getElementById("submitBtn").disabled = false;
+  document.getElementById("submitBtn").textContent = "🎲 Assign Me a Square!";
+  clearErrors();
+  var rem = 100 - countClaimed();
+  document.getElementById("remainingText").textContent =
+    "Fill out your info and we'll randomly assign you one of the " + rem + " remaining squares.";
+  document.getElementById("formModal").classList.remove("hidden");
+}
+function closeForm() { document.getElementById("formModal").classList.add("hidden"); }
+function clearErrors() {
+  ["nameError","addressError","emailError"].forEach(function(id) { document.getElementById(id).classList.remove("show"); });
+  ["nameInput","addressInput","emailInput"].forEach(function(id) { document.getElementById(id).classList.remove("error"); });
+}
+function validate() {
+  clearErrors(); var ok = true;
+  if (!document.getElementById("nameInput").value.trim()) {
+    document.getElementById("nameError").classList.add("show"); document.getElementById("nameInput").classList.add("error"); ok = false;
+  }
+  if (!document.getElementById("addressInput").value.trim()) {
+    document.getElementById("addressError").classList.add("show"); document.getElementById("addressInput").classList.add("error"); ok = false;
+  }
+  var em = document.getElementById("emailInput").value.trim();
+  if (!em) {
+    document.getElementById("emailError").textContent = "Email is required";
+    document.getElementById("emailError").classList.add("show"); document.getElementById("emailInput").classList.add("error"); ok = false;
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+    document.getElementById("emailError").textContent = "Invalid email address";
+    document.getElementById("emailError").classList.add("show"); document.getElementById("emailInput").classList.add("error"); ok = false;
+  }
+  return ok;
+}
+
+// ---- SUBMIT ----
+function handleSubmit() {
+  if (!validate()) return;
+  busy = true;
+  stopRefresh();
+  var btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ Checking...";
+
+  var name = document.getElementById("nameInput").value.trim();
+  var address = document.getElementById("addressInput").value.trim();
+  var email = document.getElementById("emailInput").value.trim();
+
+  // Step 1: refresh from server
+  loadFromServer().then(function() {
+    buildGrid(); updateUI();
+    var avail = available();
+    if (avail.length === 0) {
+      busy = false; startRefresh(); closeForm();
+      showError("All squares have been claimed!");
+      return;
+    }
+
+    // Pick random target
+    var targetKey = avail[Math.floor(Math.random() * avail.length)];
+    var p = targetKey.split("-");
+    var tr = parseInt(p[0]), tc = parseInt(p[1]);
+    log("Selected random square: " + targetKey + " (digits: " + rowDigits[tr] + " × " + colDigits[tc] + ")");
+
+    btn.textContent = "⏳ Assigning...";
+
+    // Step 2: claim on server
+    apiCall({
+      action: "claim",
+      square: targetKey,
+      rowDigit: String(rowDigits[tr]),
+      colDigit: String(colDigits[tc]),
+      name: name,
+      address: address,
+      email: email
+    }).then(function(result) {
+      if (!result.success) {
+        log("Claim rejected: " + (result.error || "unknown"));
+        busy = false; btn.disabled = false; btn.textContent = "🎲 Assign Me a Square!";
+        closeForm();
+        loadFromServer().then(function() { buildGrid(); updateUI(); startRefresh(); });
+        showError(result.error || "Something went wrong. Please try again.");
+        return;
+      }
+
+      log("Claim confirmed by server for " + targetKey);
+
+      // Step 3: immediately mark locally
+      squares[targetKey] = { name: name, email: email };
+      closeForm();
+
+      // Step 4: animate
+      var flashCount = 0, totalFlashes = 14, prevFlash = null;
+      var iv = setInterval(function() {
+        if (prevFlash) { animKey = null; refreshCell(prevFlash); }
+        var fk = avail[Math.floor(Math.random() * avail.length)];
+        animKey = fk; refreshCell(fk); prevFlash = fk;
+        flashCount++;
+        if (flashCount >= totalFlashes) {
+          clearInterval(iv);
+          animKey = null;
+          if (prevFlash) refreshCell(prevFlash);
+          // Land on target
+          animKey = targetKey; refreshCell(targetKey);
+          setTimeout(function() {
+            animKey = null;
+            assignKey = targetKey;
+            refreshCell(targetKey);
+            updateUI();
+            showResult(name, targetKey);
+            // Step 5: after delay, full server sync
+            setTimeout(function() {
+              busy = false;
+              loadFromServer().then(function() {
+                buildGrid(); updateUI(); startRefresh();
+              });
+            }, 5000);
+          }, 400);
+        }
+      }, 120);
+
+    }).catch(function(err) {
+      log("Claim API error: " + err.message);
+      busy = false; btn.disabled = false; btn.textContent = "🎲 Assign Me a Square!";
+      closeForm(); startRefresh();
+      showError("Network error — please try again.");
+    });
+
+  }).catch(function(err) {
+    log("Pre-refresh error: " + err.message);
+    busy = false; btn.disabled = false; btn.textContent = "🎲 Assign Me a Square!";
+    startRefresh();
+  });
+}
+
+// ---- MODALS ----
+function showResult(name, key) {
+  var p = key.split("-");
+  document.getElementById("resultName").textContent = name;
+  document.getElementById("resultDigitA").textContent = rowDigits[parseInt(p[0])];
+  document.getElementById("resultDigitB").textContent = colDigits[parseInt(p[1])];
+  document.getElementById("resultModal").classList.remove("hidden");
+}
+function closeResult() {
+  document.getElementById("resultModal").classList.add("hidden");
+  if (assignKey) { var prev = assignKey; assignKey = null; refreshCell(prev); }
+}
+function showError(msg) {
+  document.getElementById("errorMsg").textContent = msg;
+  document.getElementById("errorModal").classList.remove("hidden");
+}
+function closeError() { document.getElementById("errorModal").classList.add("hidden"); }
+
+// ---- INIT ----
+log("Initializing...");
+log("API URL: " + (API_URL.indexOf("YOUR_") === 0 ? "⚠️ NOT SET — replace YOUR_APPS_SCRIPT_URL_HERE" : "✓ Configured"));
+
+loadFromServer().then(function() {
+  buildGrid();
+  updateUI();
+  startRefresh();
+  log("Ready! " + countClaimed() + " squares claimed.");
+}).catch(function(err) {
+  log("INIT ERROR: " + err.message);
+  document.getElementById("loadingBar").innerHTML = "⚠️ Could not connect to server. Check your Apps Script URL.";
+});
+</script>
+</body>
+</html>
